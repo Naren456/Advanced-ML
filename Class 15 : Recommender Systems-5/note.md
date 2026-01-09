@@ -1,30 +1,47 @@
-# Notes: Recommender Systems - 5 (Class 15)
+# Class 15-16: Advanced Recommender Systems Topics
+> See Class 13 for Matrix Factorization core content.  
+> This note covers advanced topics.
 
-## Matrix Factorization & Related Algorithms
+## Advanced Techniques
 
-### 1. Unified Perspective
-*   **Matrix Factorization (MF):** The general idea of approximating a matrix $A$ as the product of smaller matrices.
-*   **K-Means as MF:** K-Means can be seen as a special case of MF where the "User Matrix" is a Cluster Assignment Matrix containing only binary values (0 or 1), with the constraint that each row sums to 1.
-*   **GMM (Gaussian Mixture Models):** A "soft" clustering version where assignments are probabilities.
-*   **NMF (Non-negative Matrix Factorization):** MF with the constraint that all factors must be non-negative ($\ge 0$). Useful for data like images (pixel intensities) or text counts where negative values don't make sense.
+### Deep Learning for Recommendations
 
-### 2. Singular Value Decomposition (SVD)
-SVD is a fundamental linear algebra decomposition:
-$$ A = U \cdot \Sigma \cdot V^T $$
-*   **$U$ (Left Singular Vectors):** Maps Users to Latent Features.
-*   **$\Sigma$ (Sigma):** Diagonal matrix of **Singular Values**. It represents the "strength" or "importance" of each latent feature.
-*   **$V^T$ (Right Singular Vectors):** Maps Items to Latent Features.
-*   **Analogy:** Like separating a music track (dataset) into individual instruments (latent patterns) and their volumes (sigma).
-*   **Applications:** Image Compression, Noise Reduction, Topic Modelling, and Recommender Systems.
+```python
+import tensorflow as tf
 
-### 3. Tuning Hyperparameters
-*   **Choosing 'd' (Number of Latent Factors):**
-    *   **Trade-off:**
-        *   Low $d$: High bias (underfitting), might miss subtle patterns.
-        *   High $d$: High variance (overfitting), computationally expensive.
-    *   **Elbow Method:** Plot **Loss vs. $d$**. As $d$ increases, loss decreases. The "elbow" point where the gain in performance diminishes is widely considered optimal.
-*   **Validation Strategy:**
-    *   **Split:** Divide known ratings into Train (e.g., 80%) and Validation (20%).
-    *   **Train:** Run MF on the 80% data for various values of $d$.
-    *   **Evaluate:** Check error (RMSE) on the held-out 20%.
-    *   **Select:** Choose the $d$ that minimizes Validation Error to avoid overfitting.
+# Neural Collaborative Filtering
+def build_ncf(n_users, n_items, embedding_dim=50):
+    user_input = tf.keras.Input(shape=(1,))
+    item_input = tf.keras.Input(shape=(1,))
+    
+    user_embed = tf.keras.layers.Embedding(n_users, embedding_dim)(user_input)
+    item_embed = tf.keras.layers.Embedding(n_items, embedding_dim)(item_input)
+    
+    user_vec = tf.keras.layers.Flatten()(user_embed)
+    item_vec = tf.keras.layers.Flatten()(item_embed)
+    
+    concat = tf.keras.layers.Concatenate()([user_vec, item_vec])
+    dense1 = tf.keras.layers.Dense(128, activation='relu')(concat)
+    dense2 = tf.keras.layers.Dense(64, activation='relu')(dense1)
+    output = tf.keras.layers.Dense(1)(dense2)
+    
+    model = tf.keras.Model([user_input, item_input], output)
+    model.compile(optimizer='adam', loss='mse')
+    return model
+```
+
+### Context-Aware Recommendations
+
+```python
+# Include contextual features (time, location, device)
+def context_aware_prediction(user, item, context_features):
+    base_score = mf_model.predict(user, item)
+    context_adjustment = context_model.predict(context_features)
+    return base_score * context_adjustment
+```
+
+**Note:** Refer to **Class 13** for:
+- Complete matrix factorization theory
+- SVD, ALS algorithms
+- Full implementation examples
+- Comprehensive exam preparation

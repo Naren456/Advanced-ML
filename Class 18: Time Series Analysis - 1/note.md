@@ -1,128 +1,539 @@
-# Class 18: Time Series Analysis - 1
+# Class 18: Time Series Analysis - Stationarity and Baseline Forecasting
 
-## 1. Introduction to Time Series
-**Time Series** data is a sequence of data points varying over time, recorded at specific time intervals (hourly, daily, weekly, etc.). In Time Series, the **order** of the data matters.
-
-### Key Characteristics
-*   **Sequential Data:** Order matters (unlike standard regression where input rows are independent).
-*   **Time as Input:** Future values are predicted based on past values and time itself ($Y_t = f(Y_{t-1}, Y_{t-2}, \dots, t)$).
-*   **Objectives:**
-    1.  **Monitoring:** Finding patterns and structure (Analysis).
-    2.  **Forecasting:** Predicting future values.
-
-### Business Importance
-Forecasting is crucial for efficient operations:
-*   **Over-forecasting:** Leads to wasted inventory, loss of value, and stuffed stores.
-*   **Under-forecasting:** Leads to lost potential revenue, unsatisfied demand, and damaged brand trust.
-*   *Goal:* Forecasting is not about perfection; it's about making **better decisions**.
-
-### Time Series vs. Regression
-*   **ML Regression:** Predicts $Y$ based on features $X$ (e.g., Sales based on Price, Quantity).
-*   **Time Series:** Predicts $Y$ based on its own past history (e.g., Future Sales based on Past Sales).
+> **Core Principle:** "Making data stationary before modeling"
 
 ---
 
-## 2. Components of Time Series
-A time series signal ($Y_t$) can be decomposed into three main components:
-
-1.  **Trend ($T_t$):** The long-term movement or direction of the data (increasing, decreasing, or stable) over a long period.
-2.  **Seasonality ($S_t$):** Repeating patterns or cycles that occur at fixed intervals (e.g., sales spiking during holidays like Diwali, or weekends vs. weekdays).
-3.  **Noise / Residual / Error ($E_t$):** Random fluctuations that cannot be explained by trend or seasonality.
-
-### Decomposition Models
-*   **Additive Model:** $Y_t = T_t + S_t + E_t$
-    *   Use when the magnitude of seasonality remains constant regardless of the trend.
-*   **Multiplicative Model:** $Y_t = T_t \times S_t \times E_t$
-    *   Use when the magnitude of seasonality changes (increases/decreases) as the trend changes.
+## Table of Contents
+1. [Stationarity](#1-stationarity)
+2. [Testing for Stationarity](#2-testing)
+3. [Making Series Stationary](#3-transformation)
+4. [Baseline Forecasting Methods](#4-baselines)
+5. [Exam Preparation](#5-exam-preparation)
 
 ---
 
-## 3. Data Cleaning: Handling Missing Values
-Time series data often has gaps. Handling them correctly is vital to preserve the signal structure.
+## 1. Stationarity
 
-### Bad Approaches
-*   **Mean Imputation:** Filling with the global mean. Creates unnatural flat lines and destroys local trends.
-*   **Zero Imputation:** Filling with 0. Distorts the data significantly.
+### 1.1 Definition
 
-### Good Approach: Linear Interpolation
-*   **Method:** Fills the missing value by drawing a straight line between the known point before and the known point after the gap.
-*   **Advantage:** Preserves the local trend and continuity of the data.
-*   **Formula:** Average of immediate neighbors (for a single missing point).
+**Stationary Series:** Statistical properties remain constant over time
+
+**Three Requirements:**
+1. **Constant mean:** $E[Y_t] = \mu$ for all $t$
+2. **Constant variance:** $\text{Var}(Y_t) = \sigma^2$ for all $t$
+3. **Constant covariance:** $\text{Cov}(Y_t, Y_{t+k})$ depends only on lag $k$, not time $t$
+
+### 1.2 Visual Examples
+
+**Stationary:**
+```
+Sales
+  |  ~~~~~~~~~~~~~~~~~~~~~~~~
+  | ~~~~~~~~~~~~~~~~~~~~~~~~~~
+  |~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  |___________________________
+  Time
+(Mean and variance constant)
+```
+
+**Non-Stationary (Trend):**
+```
+Sales
+  |                    /
+  |                  /
+  |                /
+  |              /
+  |            /
+  |__________/_______________
+  Time
+(Mean changes over time)
+```
+
+**Non-Stationary (Changing Variance):**
+```
+Sales
+  |              /\/\/\/\/\
+  |            /\/\/\
+  |          /\/\
+  |        /\
+  |______/___________________
+  Time
+(Variance increases over time)
+```
+
+### 1.3 Why Stationarity Matters
+
+**Problem:** Models like ARIMA assume constant statistical properties
+
+**If non-stationary:**
+- Parameters estimated on past won't work on future
+-Different time periods have different behavior
+- Forecasts unreliable
+
+**Analogy:** Trying to predict tomorrow's weather using last month's weather patterns when seasons are changing
 
 ---
 
-## 4. Smoothing Techniques: Moving Average (MA)
-**Moving Average** calculates the average of data points within a sliding window.
+## 2. Testing
 
-*   **Purpose:**
-    *   Reduces noise (random fluctuations).
-    *   Reveals the underlying **Trend**.
-*   **Window Size ($k$):**
-    *   **Small $k$:** Less smoothing, captures short-term fluctuations, reacts quickly to changes.
-    *   **Large $k$:** More smoothing, captures long-term trends, reacts slowly.
-*   **Lag Effect:** MA is based on past data, so it "lags" behind the actual signal. Peaks and dips appear later than they actually occurred. Sudden spikes or drops are smoothed out or delayed.
-*   **Weighted Moving Average:** Assigns different weights to data points (e.g., higher weight to recent data) to reduce lag.
+### 2.1 Visual Test - Rolling Statistics
 
----
-
-## 5. Implementation Summary (`colab.ipynb`)
-
-### 5.1 Setup and Data Loading
 ```python
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 
-# Load Data
-mobile_sales = pd.read_excel('mobilesales.xlsx')
-mobile_sales.set_index('DATE', inplace=True) # Time series requires Date index
+def plot_rolling_statistics(series, window=12):
+    """
+    Plot rolling mean and std to check stationarity visually
+    """
+    rolling_mean = series.rolling(window=window).mean()
+    rolling_std = series.rolling(window=window).std()
+    
+    fig, axes = plt.subplots(2, 1, figsize=(12, 8))
+    
+    # Original vs Rolling Mean
+    axes[0].plot(series, label='Original', alpha=0.6)
+    axes[0].plot(rolling_mean, label='Rolling Mean', color='red', linewidth=2)
+    axes[0].legend()
+    axes[0].set_title('Original Series vs Rolling Mean')
+    axes[0].grid(True, alpha=0.3)
+    
+    # Rolling Std
+    axes[1].plot(rolling_std, label='Rolling Std', color='black', linewidth=2)
+    axes[1].legend()
+    axes[1].set_title('Rolling Standard Deviation')
+    axes[1].grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.show()
+    
+    # Simple check
+    mean_var = rolling_mean.var()
+    std_var = rolling_std.var()
+    
+    print(f"Variance of rolling mean: {mean_var:.4f}")
+    print(f"Variance of rolling std: {std_var:.4f}")
+    
+    if mean_var < 0.1 * series.var() and std_var < 0.1 * series.var():
+        print("Visual check: Likely STATIONARY")
+    else:
+        print("Visual check: Likely NON-STATIONARY")
 
-# Check for missing values
-print(mobile_sales.isnull().sum()) 
+# Usage
+df = pd.read_excel('mobilesales.xlsx', parse_dates=['DATE'], index_col='DATE')
+plot_rolling_statistics(df['Sales'])
 ```
 
-### 5.2 Handling Missing Values
-The notebook demonstrates why Mean Imputation is bad and Linear Interpolation is good.
+### 2.2 ADF Test (Augmented Dickey-Fuller)
+
+**Statistical Test for Stationarity**
+
+**Hypotheses:**
+- $H_0$: Series has unit root (NON-stationary)
+- $H_1$: Series is stationary
+
+**Decision Rule:**
+- If p-value < 0.05: Reject $H_0$ → **Stationary**
+- If p-value ≥ 0.05: Fail to reject $H_0$ → **Non-stationary**
 
 ```python
-# BAD: Mean Imputation
-# mobile_sales.Sales.fillna(mobile_sales.Sales.mean()).plot()
+from statsmodels.tsa.stattools import adfuller
 
-# GOOD: Linear Interpolation
-# Fills NaNs based on neighbors
-sales_imputed = mobile_sales.Sales.interpolate(method='linear')
-mobile_sales['Sales'] = sales_imputed
-mobile_sales['Sales'].plot()
+def adf_test(series, name=''):
+    """
+    Perform Augmented Dickey-Fuller test
+    """
+    result = adfuller(series.dropna())
+    
+    print(f'\n{"="*60}')
+    print(f'ADF Test Results for {name}')
+    print(f'{"="*60}')
+    print(f'Test Statistic     : {result[0]:.6f}')
+    print(f'p-value            : {result[1]:.6f}')
+    print(f'Lags Used          : {result[2]}')
+    print(f'Number of Observations: {result[3]}')
+    print(f'\nCritical Values:')
+    for key, value in result[4].items():
+        print(f'   {key:>5s}: {value:.4f}')
+    
+    # Interpretation
+    print(f'\n{"="*60}')
+    if result[1] <= 0.05:
+        print(f'Result: STATIONARY (Reject H0)')
+        print(f'Reason: p-value ({result[1]:.6f}) < 0.05')
+        return True
+    else:
+        print(f'Result: NON-STATIONARY (Fail to reject H0)')
+        print(f'Reason: p-value ({result[1]:.6f}) >= 0.05')
+        return False
+
+# Test original series
+is_stationary = adf_test(df['Sales'], 'Mobile Sales')
 ```
 
-### 5.3 Moving Average
-Calculating Rolling Mean to smooth the data.
+### 2.3 KPSS Test (Complementary)
+
+**KPSS = Kwiatkowski-Phillips-Schmidt-Shin**
+
+**Opposite hypotheses from ADF:**
+- $H_0$: Series is stationary
+- $H_1$: Series has unit root
 
 ```python
-# Rolling window of 12 (e.g., yearly trend for monthly data)
-MA_12 = mobile_sales['Sales'].rolling(window=12).mean()
+from statsmodels.tsa.stattools import kpss
 
-# Visualization
-plt.plot(mobile_sales['Sales'], label='Original')
-plt.plot(MA_12, label='12-Month Moving Average')
+def kpss_test(series, name=''):
+    """
+    Perform KPSS test
+    """
+    result = kpss(series.dropna(), regression='c')
+    
+    print(f'\nKPSS Test Results for {name}')
+    print(f'Test Statistic: {result[0]:.6f}')
+    print(f'p-value       : {result[1]:.6f}')
+    
+    if result[1] >= 0.05:
+        print('Result: STATIONARY (Fail to reject H0)')
+        return True
+    else:
+        print('Result: NON-STATIONARY (Reject H0)')
+        return False
+
+# Combined test
+adf_stationary = adf_test(df['Sales'], 'Sales')
+kpss_stationary = kpss_test(df['Sales'], 'Sales')
+
+if adf_stationary and kpss_stationary:
+    print("\n✓ Both tests agree: STATIONARY")
+elif not adf_stationary and not kpss_stationary:
+    print("\n✗ Both tests agree: NON-STATIONARY")
+else:
+    print("\n? Tests disagree: Check visually")
+```
+
+---
+
+## 3. Transformation
+
+### 3.1 Differencing
+
+**First Difference:**
+$$Y'_t = Y_t - Y_{t-1}$$
+
+```python
+# Apply differencing
+df['Sales_diff'] = df['Sales'].diff()
+
+# Test stationarity
+adf_test(df['Sales_diff'].dropna(), 'First Differenced Sales')
+
+# Visualize
+fig, axes = plt.subplots(2, 1, figsize=(12, 8))
+
+axes[0].plot(df['Sales'])
+axes[0].set_title('Original Series')
+axes[0].grid(True, alpha=0.3)
+
+axes[1].plot(df['Sales_diff'])
+axes[1].set_title('After First Differencing')
+axes[1].axhline(y=0, color='r', linestyle='--', alpha=0.5)
+axes[1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+```
+
+**Second Difference (if needed):**
+$$Y''_t = Y'_t - Y'_{t-1} = (Y_t - Y_{t-1}) - (Y_{t-1} - Y_{t-2})$$
+
+```python
+df['Sales_diff2'] = df['Sales_diff'].diff()
+adf_test(df['Sales_diff2'].dropna(), 'Second Differenced Sales')
+```
+
+### 3.2 Seasonal Differencing
+
+For seasonal data with period $s$:
+$$Y'_t = Y_t - Y_{t-s}$$
+
+```python
+# For monthly data (s=12)
+df['Sales_seasonal_diff'] = df['Sales'].diff(periods=12)
+adf_test(df['Sales_seasonal_diff'].dropna(), 'Seasonally Differenced Sales')
+```
+
+### 3.3 Log Transform
+
+Stabilizes variance (useful when variance increases with level):
+
+$$Y'_t = \log(Y_t)$$
+
+```python
+df['Sales_log'] = np.log(df['Sales'])
+
+# Then difference if still non-stationary
+df['Sales_log_diff'] = df['Sales_log'].diff()
+adf_test(df['Sales_log_diff'].dropna(), 'Log-Differenced Sales')
+```
+
+### 3.4 Automated Differencing
+
+```python
+def make_stationary(series, max_diff=3):
+    """
+    Automatically difference until stationary
+    """
+    d = 0
+    temp = series.copy()
+    
+    while d <= max_diff:
+        result = adfuller(temp.dropna())
+        p_value = result[1]
+        
+        print(f"d={d}: ADF p-value = {p_value:.6f}", end='')
+        
+        if p_value < 0.05:
+            print(" → STATIONARY ✓")
+            break
+        else:
+            print(" → NON-STATIONARY, differencing...")
+            temp = temp.diff()
+            d += 1
+    
+    if d > max_diff:
+        print(f"\n⚠️  Warning: Still non-stationary after {max_diff} differences")
+    
+    return temp, d
+
+stationary_series, diff_order = make_stationary(df['Sales'])
+print(f"\nOptimal differencing order: d={diff_order}")
+```
+
+---
+
+## 4. Baselines
+
+### 4.1 Naive Method
+
+**Formula:** $\hat{Y}_{t+1} = Y_t$
+
+"Tomorrow will be exactly like today"
+
+```python
+def naive_forecast(train, test):
+    """
+    Naive baseline: forecast = last value
+    """
+    last_value = train.iloc[-1]
+    predictions = np.array([last_value] * len(test))
+    return predictions
+
+# Example
+train_size = int(len(df) * 0.8)
+train = df['Sales'][:train_size]
+test = df['Sales'][train_size:]
+
+naive_pred = naive_forecast(train, test)
+
+# Plot
+plt.figure(figsize=(12, 6))
+plt.plot(train.index, train, label='Train')
+plt.plot(test.index, test, label='Test (Actual)', linewidth=2)
+plt.plot(test.index, naive_pred, label='Naive Forecast', linestyle='--')
 plt.legend()
+plt.title('Naive Forecasting')
+plt.grid(True, alpha=0.3)
 plt.show()
 ```
 
-### 5.4 Decomposition
-Using `statsmodels` to separate Trend, Seasonality, and Noise.
+### 4.2 Simple Average
+
+**Formula:** $\hat{Y}_{t+1} = \frac{1}{t}\sum_{i=1}^{t} Y_i$
 
 ```python
-from statsmodels.tsa.seasonal import seasonal_decompose
+def average_forecast(train, test):
+    """
+    Average method: forecast = mean of all historical data
+    """
+    mean_value = train.mean()
+    return np.array([mean_value] * len(test))
 
-# Additive Decomposition
-decomposition = seasonal_decompose(mobile_sales['Sales'], model='additive')
-
-# Components
-trend = decomposition.trend
-seasonal = decomposition.seasonal
-residual = decomposition.resid
-
-# Plotting
-decomposition.plot()
-plt.show()
+avg_pred = average_forecast(train, test)
 ```
+
+### 4.3 Seasonal Naive
+
+**Formula:** $\hat{Y}_t = Y_{t-s}$
+
+"This December will be like last December"
+
+```python
+def seasonal_naive(train, test, season_length=12):
+    """
+    Seasonal naive: use value from same season last year
+    """
+    predictions = []
+    
+    for i in range(len(test)):
+        # Look back by season_length
+        if len(train) >= season_length:
+            pred = train.iloc[-(season_length - (i % season_length))]
+        else:
+            pred = train.iloc[-1]  # Fallback to naive
+        predictions.append(pred)
+    
+    return np.array(predictions)
+
+seasonal_pred = seasonal_naive(train, test, season_length=12)
+```
+
+### 4.4 Drift Method
+
+**Formula:** $\hat{Y}_{t+h} = Y_t + h \times \frac{Y_t - Y_1}{t-1}$
+
+Extends the line from first to last observation
+
+```python
+def drift_forecast(train, test):
+    """
+    Drift method: linear trend from start to end, extended
+    """
+    last_value = train.iloc[-1]
+    first_value = train.iloc[0]
+    n = len(train)
+    
+    # Drift (slope)
+    drift = (last_value - first_value) / (n - 1)
+    
+    # Forecast
+    predictions = [last_value + drift * (i + 1) for i in range(len(test))]
+    return np.array(predictions)
+
+drift_pred = drift_forecast(train, test)
+```
+
+### 4.5 Evaluation
+
+```python
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+
+def evaluate_forecast(actual, predicted, method_name):
+    """
+    Calculate forecast accuracy metrics
+    """
+    mae = mean_absolute_error(actual, predicted)
+    rmse = np.sqrt(mean_squared_error(actual, predicted))
+    mape = np.mean(np.abs((actual - predicted) / actual)) * 100
+    
+    print(f"\n{method_name}:")
+    print(f"  MAE  : {mae:.2f}")
+    print(f"  RMSE : {rmse:.2f}")
+    print(f"  MAPE : {mape:.2f}%")
+    
+    return {'MAE': mae, 'RMSE': rmse, 'MAPE': mape}
+
+# Evaluate all methods
+results = {}
+results['Naive'] = evaluate_forecast(test, naive_pred, 'Naive')
+results['Average'] = evaluate_forecast(test, avg_pred, 'Average')
+results['Seasonal Naive'] = evaluate_forecast(test, seasonal_pred, 'Seasonal Naive')
+results['Drift'] = evaluate_forecast(test, drift_pred, 'Drift')
+
+# Best method
+best_method = min(results.keys(), key=lambda k: results[k]['MAPE'])
+print(f"\n✓ Best baseline method: {best_method}")
+```
+
+---
+
+## 5. Exam Preparation
+
+### 5.1 Key Formulas
+
+| Method | Formula | When to Use |
+|--------|---------|-------------|
+| **Differencing** | $Y'_t = Y_t - Y_{t-1}$ | Remove trend |
+| **Log Transform** | $Y'_t = \log(Y_t)$ | Stabilize variance |
+| **Seasonal Diff** | $Y'_t = Y_t - Y_{t-s}$ | Remove seasonality |
+| **Naive** | $\hat{Y}_{t+1} = Y_t$ | Random walk data |
+| **Seasonal Naive** | $\hat{Y}_t = Y_{t-s}$ | Strong seasonality |
+
+### 5.2 Common Exam Questions
+
+**Q1: ADF test gives p-value = 0.12. Is the series stationary?**
+
+**Answer:** No, **NON-STATIONARY**
+- p-value (0.12) > 0.05
+- Fail to reject $H_0$ (unit root exists)
+- Need to difference the series
+
+**Q2: After first differencing, ADF p-value = 0.001. Now stationary?**
+
+**Answer:** Yes, **STATIONARY**
+- p-value (0.001) < 0.05
+- Reject $H_0$
+- Series is now stationary with d=1
+
+**Q3: Given data: [100, 102, 105, 103, 108]. Calculate first difference.**
+
+**Solution:**
+$$Y'_t = Y_t - Y_{t-1}$$
+
+- $Y'_2 = 102 - 100 = 2$
+- $Y'_3 = 105 - 102 = 3$
+- $Y'_4 = 103 - 105 = -2$
+- $Y'_5 = 108 - 103 = 5$
+
+**First differenced series:** [NaN, 2, 3, -2, 5]
+
+### 5.3 Interview Questions
+
+**Q: You difference a series twice but it's still non-stationary. What could be wrong?**
+
+**A:** Possible issues:
+1. **Strong seasonality:** Try seasonal differencing instead
+2. **Non-linear trend:** Try log transform first, then difference
+3. **Structural breaks:** Data has regime changes (need different approach)
+4. **Outliers:** Extreme values affecting test results
+5. **Too short series:** Need more data for reliable test
+
+**Q: Your model performs worse than naive baseline. What does this tell you?**
+
+**A:** 
+- Model isn't learning useful patterns
+- Data might be random walk (naive is optimal)
+- Over-complicated model (Occam's razor)
+- **Actions:**
+  - Simplify model
+  - Check if data is actually predictable
+  - Try different features/transformations
+
+---
+
+## Summary
+
+**Stationarity Requirements:**
+1. Constant mean over time
+2. Constant variance over time
+3. Covariance depends only on lag, not time
+
+**Testing:**
+- **Visual:** Rolling mean/std plots
+- **Statistical:** ADF test (p < 0.05 → stationary)
+
+**Achieving Stationarity:**
+- **Differencing:** Removes trend
+- **Log transform:** Stabilizes variance
+- **Seasonal differencing:** Removes seasonality
+
+**Baseline Methods:**
+- **Naive:** Use last value
+- **Average:** Use mean
+- **Seasonal Naive:** Use last season's value
+- **Drift:** Linear extrapolation
+
+**Key Insight:** Always compare advanced models to baselines!
+
+**Next Class:** Smoothing techniques (Moving Average, Exponential Smoothing)

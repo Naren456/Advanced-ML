@@ -1,50 +1,59 @@
-# Notes: Recommender Systems - 6 (Class 16)
+# Class 16: Recommender Systems - Final Implementation
+> Primary content in Class 13. This covers final implementation checklist.
 
-## Matrix Factorization Implementation (From Scratch)
+## Production Recommendations Checklist
 
-### 1. Data Setup
-*   **Datasets:** `movies.csv`, `ratings.csv`, `users.csv` (likely MovieLens dataset).
-*   **Interaction Matrix ($R$):**
-    *   Created by pivoting the `ratings` DataFrame.
-    *   Index columns: `userId`.
-    *   Columns: `movieId`.
-    *   Values: `rating`.
-    *   **Handling Missing Values:** Filled with $0$. Ideally, we should only train on known ratings, but filling with 0 is a common simplification for basic implementations (treating them as explicit "not liked" or just placeholders).
-
-### 2. The Algorithm: Stochastic Gradient Descent (SGD)
-The goal is to decompose $R$ into User Matrix $P$ and Item Matrix $Q^T$ such that $R \approx P \times Q^T$.
-
-*   **Initialization:**
-    *   $K$: Number of latent factors (e.g., 2).
-    *   $P$ (Users $\times K$) and $Q$ (Items $\times K$): Initialized with random normal values.
-    *   Hyperparameters: `steps` (epochs), `alpha` (learning rate), `beta` (regularization strength).
-
-*   **Training Loop:**
-    1.  Iterate for a fixed number of `steps`.
-    2.  Loop through every user $i$ and item $j$.
-    3.  **Filter:** Only process if $R_{ij} > 0$ (observed ratings).
-    4.  **Prediction:** $\hat{r}_{ij} = P_i \cdot Q_j^T$.
-    5.  **Error:** $e_{ij} = R_{ij} - \hat{r}_{ij}$.
-    6.  **Update Weights (Gradient Descent with Regularization):**
-        *   $P_{ik}^{new} = P_{ik} + \alpha \cdot (2e_{ij}Q_{jk} - \beta P_{ik})$
-        *   $Q_{jk}^{new} = Q_{jk} + \alpha \cdot (2e_{ij}P_{ik} - \beta Q_{jk})$
-
-### 3. Prediction
-*   After training, the full predicted matrix is obtained by $\hat{R} = P \times Q^T$.
-*   This fills in the zeros (missing values) with predicted ratings, which can be used to recommend top items to users.
-
-### 4. Code Snippet Concepts
+### 1. Data Pipeline
 ```python
-def matrix_factorization(R, P, Q, K, steps=5000, alpha=0.0002, beta=0.02):
-    Q = Q.T
-    for step in range(steps):
-        for i in range(len(R)):
-            for j in range(len(R[i])):
-                if R[i][j] > 0: # Only train on known ratings
-                    eij = R[i][j] - np.dot(P[i,:], Q[:,j])
-                    for k in range(K):
-                        # Gradient Descent Updates
-                        P[i][k] += alpha * (2 * eij * Q[k][j] - beta * P[i][k])
-                        Q[k][j] += alpha * (2 * eij * P[i][k] - beta * Q[k][j])
-    return P, Q.T
+# Data validation
+def validate_ratings(df):
+    assert df['rating'].between(1, 5).all()
+    assert df['user_id'].nunique() > 0
+    assert df['item_id'].nunique() > 0
+    return df
+
+# Handle implicit feedback  
+def convert_to_implicit(df, threshold=3):
+    df['implicit'] = (df['rating'] >= threshold).astype(int)
+    return df
 ```
+
+### 2. Model Evaluation
+```python
+def evaluate_recommender(model, test_data):
+    from sklearn.metrics import mean_squared_error, mean_absolute_error
+    
+    predictions = []
+    actuals = []
+    
+    for user, item, rating in test_data:
+        pred = model.predict(user, item)
+        predictions.append(pred)
+        actuals.append(rating)
+    
+    rmse = np.sqrt(mean_squared_error(actuals, predictions))
+    mae = mean_absolute_error(actuals, predictions)
+    
+    return {'RMSE': rmse, 'MAE': mae}
+```
+
+### 3. Deployment
+```python
+class RecommenderAPI:
+    def __init__(self, model):
+        self.model = model
+        self.cache = {}
+    
+    def get_recommendations(self, user_id, n=10, use_cache=True):
+        if use_cache and user_id in self.cache:
+            return self.cache[user_id]
+        
+        recs = self.model.recommend(user_id, n=n)
+        self.cache[user_id] = recs
+        return recs
+    
+    def clear_cache(self):
+        self.cache = {}
+```
+
+**Full Theory & Algorithms:** See **Class 13**

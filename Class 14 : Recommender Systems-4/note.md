@@ -1,42 +1,49 @@
-# Notes: Recommender Systems - 4 (Class 14)
+# Class 14-16: Matrix Factorization Implementation & Optimization
+> See Class 13 for comprehensive Matrix Factorization theory.  
+> This note covers advanced implementation details.
 
-## Matrix Factorization (MF) Breakdown
+## Additional Implementation Details
 
-### 1. The Core Idea
-*   **Problem:** The User-Item Matrix ($A$) is huge and sparse (mostly empty). Using standard methods is inefficient.
-*   **Solution:** Decompose/Factorize the matrix $A$ ($n \times m$) into two lower-dimensional matrices:
-    *   **User Matrix ($B$):** $n \times d$ (Users $\times$ Latent Factors)
-    *   **Item Matrix ($C$):** $d \times m$ (Latent Factors $\times$ Items)
-*   **Latent Factors ($d$):** Hidden features that explain preferences (e.g., "Action vs Romance", "Old vs New"). The algorithm learns these automatically.
-*   **Prediction:** The predicted rating for User $i$ and Item $j$ is the dot product of their vectors:
-    $$ \hat{r}_{ij} = B_i \cdot C_j $$
+### Alternative Factorization: NMF (Non-Negative Matrix Factorization)
 
-### 2. Learning the Factors
-*   We learn the values in $B$ and $C$ by minimizing the difference between the **Predicted Rating** and the **Actual Rating** (for the few ratings we actually have).
-*   **Loss Function:**
-    $$ L = \sum (r_{ij} - B_i \cdot C_j)^2 + \lambda (||B_i||^2 + ||C_j||^2) $$
-    *   The first term is the **Squared Error**.
-    *   The second term is **Regularization** ($\lambda$) to prevent overfitting (keeps values small).
+```python
+from sklearn.decomposition import NMF
 
-### 3. Optimization Algorithms
-How do we find the best $B$ and $C$ to minimize Loss?
+# Ensure ratings are non-negative
+ratings_matrix = np.array([[5,3,0,1],[4,0,0,1],[1,1,5,4],[1,0,4,5]])
 
-#### A. Stochastic Gradient Descent (SGD)
-*   **Method:**
-    1.  Initialize $B$ and $C$ randomly.
-    2.  For each known rating, calculate the error.
-    3.  Update the user and item vectors slightly in the opposite direction of the gradient.
-    4.  Repeat until convergence.
-*   **Pros:** Simple, accurate.
-*   **Cons:** Can be slow on huge datasets; sensitive to learning rate.
+nmf = NMF(n_components=2, init='random', random_state=42)
+W = nmf.fit_transform(ratings_matrix)  # User factors
+H = nmf.components_  # Item factors
 
-#### B. Alternating Least Squares (ALS)
-*   **Method:**
-    1.  Fix Matrix $B$ (treat it as constant) $\rightarrow$ The problem becomes a simple quadratic (easy to solve) to find best $C$.
-    2.  Fix Matrix $C$ (treat it as constant) $\rightarrow$ Solve for best $B$.
-    3.  Alternate back and forth until convergence.
-*   **Pros:** Handles massive datasets well (parallelizable), very stable.
-*   **Cons:** Mathematically slightly more complex per step.
+# Reconstruct
+predicted = W @ H
+print("NMF Reconstruction:\n", predicted)
+```
 
-### 4. Connection to SVD
-*   **SVD (Singular Value Decomposition):** A linear algebra technique for dimensionality reduction. Matrix Factorization in RecSys is essentially a functional approximation of SVD optimized for sparse data.
+### Hyperparameter Tuning
+
+```python
+from sklearn.model_selection import GridSearchCV
+
+param_grid = {
+    'n_factors': [10, 20, 50],
+    'n_epochs': [20, 30],
+    'lr_all': [0.002, 0.005],
+    'reg_all': [0.02, 0.1]
+}
+
+# Use Surprise's GridSearchCV
+gs = GridSearchCV(SVD, param_grid, measures=['rmse'], cv=3)
+gs.fit(dataset)
+
+print(f"Best RMSE: {gs.best_score['rmse']}")
+print(f"Best params: {gs.best_params['rmse']}")
+```
+
+**Note:** For complete theory, algorithms, and comprehensive examples, refer to **Class 13** which covers:
+- Matrix Factorization fundamentals
+- SVD and ALS algorithms  
+- SGD optimization
+- Hybrid recommender systems
+- All exam preparation materials
