@@ -1,470 +1,224 @@
-# Class 19: Time Series Analysis - Smoothing Techniques
+# Class 19: Time Series Analysis - Evaluation and Baseline Forecasting
 
-> **Core Principle:** "Removing noise to reveal underlying patterns"
+> **Core Principle:** "Establishing a baseline to measure progress"
 
 ---
 
 ## Table of Contents
-1. [Why Smoothing?](#1-why-smoothing)
-2. [Moving Average](#2-moving-average)
-3. [Exponential Smoothing](#3-exponential-smoothing)
-4. [Evaluation](#4-evaluation)
-5. [Exam Preparation](#5-exam-preparation)
+1. [Announcements](#1-announcements)
+2. [Recap: Decomposition](#2-recap-decomposition)
+3. [Evaluation Metrics](#3-evaluation-metrics)
+4. [Train-Test Split](#4-train-test-split)
+5. [Baseline Forecasting Methods](#5-baseline-forecasting-methods)
+6. [Introduction to Smoothing](#6-introduction-to-smoothing)
 
 ---
 
-## 1. Why Smoothing?
+## 1. Announcements
 
-### 1.1 The Problem
+### 1.1 Class Schedule
+- **No Class:** Wednesday, December 24 (Holiday)
+- **Next Class:** Monday, January 5
 
-**Raw time series data is noisy:**
-- Random fluctuations obscure true pattern
-- Difficult to identify trend
-- Hard to make forecasts
-
-**Goal:** Extract underlying signal from noise
-
-### 1.2 Signal vs Noise
-
-```
-Noisy Data:               Smoothed Data:
-Sales                     Sales
-  | ●  ●                    |
-  |  ●●  ●                  |     ████
-  | ●  ●● ●                 |   ██    ██
-  |●     ●  ●               | ██        ██
-  |_________                |_____________
-  Time                      Time
-(Hard to see trend)       (Clear upward trend)
-```
+### 1.2 Grading Criteria
+| Component | Weightage | Details |
+|-----------|-----------|---------|
+| **Project** | 30% | Submission details to be shared. Deadline: Jan 15. |
+| **Viva** | 30% | Starting Jan 15. May be conducted in groups. |
+| **Anthem Exam**| 40% | End of January. Online, proctored (MCQ + Subjective). |
 
 ---
 
-## 2. Moving Average
+## 2. Recap: Decomposition
 
-### 2.1 Simple Moving Average (SMA)
+Any time series can be broken down into three fundamental components:
 
-**Formula:**
-$$\text{MA}_t(k) = \frac{1}{k}\sum_{i=0}^{k-1} Y_{t-i}$$
+1.  **Trend ($T_t$):** The long-term behavior or direction (increasing/decreasing).
+2.  **Seasonality ($S_t$):** Repeating patterns at fixed intervals (e.g., every December).
+3.  **Error / Residual ($E_t$):** What remains after extracting Trend and Seasonality.
+    - *Formula (Additive):* $E_t = Y_t - T_t - S_t$
 
-**Example:** 3-day moving average
-$$\text{MA}_t(3) = \frac{Y_t + Y_{t-1} + Y_{t-2}}{3}$$
+---
 
-### 2.2 Implementation
+## 3. Evaluation Metrics
+
+How do we know if our forecast is "good"? We need objective numbers.
+
+### 3.1 MAPE (Mean Absolute Percentage Error)
+$$MAPE = \frac{1}{n} \sum \left| \frac{y_i - \hat{y}_i}{y_i} \right| \times 100$$
+
+-   **Interpretation:** Represents the average error as a percentage. "On average, my forecast is off by X%".
+-   **Desired Value:** Typically **< 5%** is considered excellent, but depends on industry.
+-   **Edge Case:** If actual value $y_i = 0$, MAPE is **undefined** (division by zero).
+
+### 3.2 MSE (Mean Squared Error)
+$$MSE = \frac{1}{n} \sum (y_i - \hat{y}_i)^2$$
+
+-   **Pros:** Penalizes large errors heavily (due to squaring).
+-   **Cons:** Not in the same unit as data (e.g., "Sales squared"). Hard to interpret.
+
+### 3.3 RMSE (Root Mean Squared Error)
+$$RMSE = \sqrt{MSE}$$
+
+-   **Pros:** Same unit as the original data ("Sales").
+-   **Interpretation:** "On average, forecasts deviate by X units from actuals".
+
+---
+
+## 4. Train-Test Split
+
+### 4.1 The Golden Rule of Time Series
+**Never shuffle the data.**
+
+In classical ML, we random split ($80:20$). In Time Series, this destroys the temporal dependence (leakage of future info).
+
+### 4.2 Sequential Splitting
+We must split based on **time**.
+
+**Example:**
+-   **Dataset:** 18 years of historical data.
+-   **Train:** First 17 years (History for learning).
+-   **Test:** Last 1 year (Future for evaluation).
+
+*Note:* There is no separate "Y" column (Target). The "Value" column itself is both input (past) and output (future).
+
+---
+
+## 5. Baseline Forecasting Methods
+
+Before building complex models (ARIMA, LSTM), we must establish a baseline. If a complex model can't beat these, it's useless.
+
+### 5.0 Data Setup & Evaluation Function
+*Extracted from Notebook:*
 
 ```python
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+from sklearn.metrics import mean_absolute_error as mae, mean_squared_error as mse, mean_absolute_percentage_error as mape
 
-# Load data
-df = pd.read_excel('mobilesales.xlsx', parse_dates=['DATE'], index_col='DATE')
+# 1. Define Split Parameters
+train_len = 212
+test_len = 24
 
-# Calculate different window sizes
-df['MA_3'] = df['Sales'].rolling(window=3).mean()
-df['MA_6'] = df['Sales'].rolling(window=6).mean()
-df['MA_12'] = df['Sales'].rolling(window=12).mean()
+# 2. Create Train/Test Sets
+# Assuming 'mobile_sales' is our resampled DataFrame with a 'Sales' column
+train_x = mobile_sales.iloc[:train_len].copy()
+test_x = mobile_sales.iloc[train_len:].copy()
 
-# Visualize
-plt.figure(figsize=(14, 7))
-plt.plot(df['Sales'], label='Original', alpha=0.5, linewidth=1)
-plt.plot(df['MA_3'], label='MA-3', linewidth=2)
-plt.plot(df['MA_6'], label='MA-6', linewidth=2)
-plt.plot(df['MA_12'], label='MA-12', linewidth=2)
-plt.legend()
-plt.title('Moving Averages with Different Window Sizes')
-plt.xlabel('Date')
-plt.ylabel('Sales')
-plt.grid(True, alpha=0.3)
-plt.show()
+# 3. Define Evaluation Function
+# Note: The notebook calculates RMSE but prints 'MSE' in the label. 
+# We calculate root of MSE for the second metric.
+def performane(actual, predicted):
+    print("MAE:", round(mae(actual, predicted), 3))
+    print("RMSE:", round(mse(actual, predicted)**0.5, 3))
+    print("MAPE:", round(mape(actual, predicted), 3))
 ```
 
-### 2.3 Properties
+### 5.1 Simple Mean Forecasting
+-   **Method:** Forecast = Average of *all* historical data.
+-   **Result:** A horizontal (flat) line.
+-   **Verdict:** **Not intelligent.** Fails to capture trend or seasonality.
 
-**Advantages:**
-- Simple to understand and implement
-- Reduces noise effectively
-- No parameters except window size
-
-**Disadvantages:**
-1. **Lags behind trend:**
-   - Averages past data → delayed reaction to changes
-   - Larger window = more lag
-
-2. **Equal weights:**
-   - Data from 12 months ago weighted same as yesterday
-   - Ignores recency
-
-3. **Cannot forecast:**
-   - Only smooths existing data
-   - Need separate forecasting method
-
-### 2.4 Choosing Window Size
-
-**Trade-off:**
-- **Small window (3-5):** Responsive but noisy
-- **Large window (12+):** Smooth but lags
-
-**Selection:**
 ```python
-# For monthly data with yearly seasonality
-window = 12  # One full cycle
+# Simple Mean
+# Method: Forecast next values as the mean of all training values
+mean_val = train_x['Sales'].mean()
+test_x['pred'] = mean_val
 
-# For daily data with weekly pattern
-window = 7   # One full week
+# Evaluate
+performane(test_x.Sales, test_x.pred)
 ```
 
----
+### 5.2 Naive Approach
+-   **Method:** Forecast = The *last observed value* ($Y_{t+1} = Y_t$).
+-   **Result:** A horizontal (flat) line continuing the last point.
+-   **Verdict:** **Not intelligent** for long horizons, but surprisingly hard to beat for stock prices (Random Walk).
 
-## 3. Exponential Smoothing
+```python
+# Naive Approach
+# Method: Forecast next values as the last observed training value
+test_x['pred'] = train_x.Sales.iloc[-1]
 
-### 3.1 Simple Exponential Smoothing (SES)
+# Evaluate & Plot
+performane(test_x.Sales, test_x.pred)
+test_x['Sales'].plot(style='-o', legend=True, label='Actual')
+test_x['pred'].plot(style='--', legend=True, label='Naive Forecast')
+```
 
-**Key Idea:** Recent data more important than old data
+### 5.3 Seasonal Naive Forecast
+-   **Method:** Forecast = The value from the *same season last year*.
+-   **Example:** Forecast for Dec 2024 = Actual Sales of Dec 2023.
+-   **Pros:** Captures **Seasonality** perfectly.
+-   **Cons:** Misses **Trend** (if sales are growing year-over-year, this will under-forecast).
+-   **Verdict:** Uses real historic patterns. More acceptable to businesses than plain Naive.
+
+```python
+# Seasonal Naive Approach
+# Method: Forecast val(t) as the value from 1 year ago (t-12 months)
+
+for i in test_x.index:
+    # Locating the date 1 year prior to index 'i'
+    # Note: Corrected 'dateOffset' to 'DateOffset' from original notebook
+    prev_year_date = i - pd.DateOffset(years=1)
+    
+    # Assigning the sales value from that past date
+    test_x.loc[i, 'pred'] = train_x.loc[prev_year_date]['Sales']
+
+# Evaluate
+performane(test_x.Sales, test_x.pred)
+```
+
+### 5.4 Drift Method
+Unlike the Naive method (flat line), the Drift method allows the forecast to increase or decrease over time.
+
+**Concept:**
+It draws a straight line between the **first observation** ($y_1$) and the **last observation** ($y_T$) and extends it into the future.
 
 **Formula:**
-$$\hat{Y}_{t+1} = \alpha Y_t + (1-\alpha)\hat{Y}_t$$
+$$\hat{y}_{T+h} = y_T + h \left( \frac{y_T - y_1}{T-1} \right)$$
+*Where:*
+- $h$: Forecast horizon (how many steps ahead).
+- $\frac{y_T - y_1}{T-1}$: The average change (slope) over the entire history.
 
-where $\alpha \in (0,1)$ is the smoothing parameter
+**Pros/Cons:**
+- **Pros:** Captures the long-term **Trend** (if training data starts low and ends high, forecast goes up).
+- **Cons:** Misses Seasonality; very sensitive to the first and last points (outliers can skew the slope).
 
-**Expanded form:**
-$$\hat{Y}_{t+1} = \alpha Y_t + \alpha(1-\alpha)Y_{t-1} + \alpha(1-\alpha)^2Y_{t-2} + ...$$
-
-**Weights decay exponentially!**
-
-### 3.2 Alpha Parameter
-
-**Effect of $\alpha$:**
-
-```
-α = 0.9 (High):              α = 0.1 (Low):
-  Weights:                     Weights:
-  0.9  ●                       0.1    ●
-  0.09   ●                     0.09     ●
-  0.009    ●                   0.081      ●
-  (Recent data dominates)      (Past data matters)
-```
-
-**When to use:**
-- **High α (0.7-0.9):** Volatile data, need fast response
-- **Low α (0.1-0.3):** Stable data, prefer smoothness
-
-### 3.3 Implementation
+**Visual:**
+Think of it as drawing a "line of best fit" that is forced to connect exactly the start and end points.
 
 ```python
-from statsmodels.tsa.holtwinters import SimpleExpSmoothing
+# Drift Method
+# Method: Linear interpolation from first point to last point of training data
 
-# Fit SES model
-ses_model = SimpleExpSmoothing(train['Sales'])
-fitted_model = ses_model.fit(smoothing_level=0.2, optimized=False)
+# 1. Get First and Last Training Values
+y_t = train_x['Sales'].iloc[-1]  # Last value
+y_1 = train_x['Sales'].iloc[0]   # First value
+T = len(train_x)                 # Total training duration
 
-# Or optimize alpha automatically
-fitted_model_opt = ses_model.fit()
-alpha_opt = fitted_model_opt.params['smoothing_level']
-print(f"Optimized alpha: {alpha_opt:.3f}")
+# 2. Calculate Slope (Drift)
+# Notebook formula: (y_t - y_1) / len(train)
+# Standard formula often uses (T-1), but we stick to notebook logic or close approximation
+m = (y_t - y_1) / T 
 
-# Forecast
-forecast = fitted_model.forecast(steps=len(test))
+# 3. Generate Forecasts
+# h is the step number into the future (1, 2, ..., 24)
+h = np.arange(1, len(test_x) + 1)
+test_x['pred'] = y_t + m * h
 
-# Plot
-plt.figure(figsize=(14, 7))
-plt.plot(train.index, train, label='Train')
-plt.plot(test.index, test, label='Test (Actual)', linewidth=2)
-plt.plot(test.index, forecast, label=f'SES Forecast (α={0.2})', 
-         linestyle='--', linewidth=2)
-plt.legend()
-plt.title('Simple Exponential Smoothing')
-plt.grid(True, alpha=0.3)
-plt.show()
-```
-
-### 3.4 Double Exponential Smoothing (Holt's Method)
-
-**Adds trend component**
-
-**Level equation:**
-$$\ell_t = \alpha Y_t + (1-\alpha)(\ell_{t-1} + b_{t-1})$$
-
-**Trend equation:**
-$$b_t = \beta(\ell_t - \ell_{t-1}) + (1-\beta)b_{t-1}$$
-
-**Forecast:**
-$$\hat{Y}_{t+h} = \ell_t + h \cdot b_t$$
-
-**Parameters:**
-- $\alpha$: Level smoothing (0-1)
-- $\beta$: Trend smoothing (0-1)
-
-```python
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
-
-# Fit Holt's method
-holt = ExponentialSmoothing(train['Sales'], trend='add', seasonal=None)
-holt_fit = holt.fit()
-
-# Forecast
-holt_forecast = holt_fit.forecast(len(test))
-
-print(f"Alpha (level): {holt_fit.params['smoothing_level']:.3f}")
-print(f"Beta (trend): {holt_fit.params['smoothing_trend']:.3f}")
-```
-
-### 3.5 Triple Exponential Smoothing (Holt-Winters)
-
-**Adds seasonality**
-
-**Three equations:**
-
-**Level:**
-$$\ell_t = \alpha(Y_t - s_{t-m}) + (1-\alpha)(\ell_{t-1} + b_{t-1})$$
-
-**Trend:**
-$$b_t = \beta(\ell_t - \ell_{t-1}) + (1-\beta)b_{t-1}$$
-
-**Seasonality:**
-$$s_t = \gamma(Y_t - \ell_t) + (1-\gamma)s_{t-m}$$
-
-**Forecast (Additive):**
-$$\hat{Y}_{t+h} = \ell_t + h \cdot b_t + s_{t+h-m}$$
-
-**Forecast (Multiplicative):**
-$$\hat{Y}_{t+h} = (\ell_t + h \cdot b_t) \times s_{t+h-m}$$
-
-### 3.6 Additive vs Multiplicative
-
-**Additive ($Y = L + T + S$):**
-- Seasonal amplitude constant
-- Use when seasonal variation doesn't change with level
-
-**Multiplicative ($Y = L \times T \times S$):**
-- Seasonal amplitude grows with level
-- Use when seasonal variation proportional to level
-
-```python
-# Additive seasonality
-hw_add = ExponentialSmoothing(train['Sales'], 
-                               trend='add',
-                               seasonal='add',
-                               seasonal_periods=12)
-hw_add_fit = hw_add.fit()
-
-# Multiplicative seasonality
-hw_mul = ExponentialSmoothing(train['Sales'],
-                               trend='add',
-                               seasonal='mul',
-                               seasonal_periods=12)
-hw_mul_fit = hw_mul.fit()
-
-# Forecast
-add_forecast = hw_add_fit.forecast(len(test))
-mul_forecast = hw_mul_fit.forecast(len(test))
-
-# Compare
-fig, axes = plt.subplots(2, 1, figsize=(14, 10))
-
-axes[0].plot(train.index, train, label='Train')
-axes[0].plot(test.index, test, label='Test', linewidth=2)
-axes[0].plot(test.index, add_forecast, label='Additive', linestyle='--')
-axes[0].set_title('Holt-Winters Additive')
-axes[0].legend()
-axes[0].grid(True, alpha=0.3)
-
-axes[1].plot(train.index, train, label='Train')
-axes[1].plot(test.index, test, label='Test', linewidth=2)
-axes[1].plot(test.index, mul_forecast, label='Multiplicative', linestyle='--')
-axes[1].set_title('Holt-Winters Multiplicative')
-axes[1].legend()
-axes[1].grid(True, alpha=0.3)
-
-plt.tight_layout()
-plt.show()
+# Evaluate
+performane(test_x.Sales, test_x.pred)
 ```
 
 ---
 
-## 4. Evaluation
+## 6. Introduction to Smoothing (Preview)
 
-### 4.1 Metrics
+In the upcoming class, we will explore **Smoothing Techniques** to filter noise and forecast:
 
-```python
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+1.  **Moving Average Forecasting:** Non-centered MA for prediction.
+2.  **Simple Exponential Smoothing (SES):** Weighted average.
+3.  **Holt's Method:** Double Exponential Smoothing (Trend).
+4.  **Holt-Winters Method:** Triple Exponential Smoothing (Trend + Seasonality).
 
-def evaluate_forecast(actual, predicted, name='Model'):
-    """
-    Calculate forecast metrics
-    """
-    mae = mean_absolute_error(actual, predicted)
-    rmse = np.sqrt(mean_squared_error(actual, predicted))
-    mape = np.mean(np.abs((actual - predicted) / actual)) * 100
-    
-    print(f"\n{name}:")
-    print(f"  MAE  : {mae:.2f}")
-    print(f"  RMSE : {rmse:.2f}")
-    print(f"  MAPE : {mape:.2f}%")
-    
-    return {'MAE': mae, 'RMSE': rmse, 'MAPE': mape}
-
-# Evaluate all models
-results = {}
-results['MA-12'] = evaluate_forecast(test, ma_forecast, 'Moving Average')
-results['SES'] = evaluate_forecast(test, ses_forecast, 'Simple Exp Smoothing')
-results['Holt'] = evaluate_forecast(test, holt_forecast, "Holt's Method")
-results['HW-Add'] = evaluate_forecast(test, add_forecast, 'HW Additive')
-results['HW-Mul'] = evaluate_forecast(test, mul_forecast, 'HW Multiplicative')
-
-# Best model
-best = min(results.items(), key=lambda x: x[1]['MAPE'])
-print(f"\n✓ Best Model: {best[0]} (MAPE: {best[1]['MAPE']:.2f}%)")
-```
-
-### 4.2 Residual Analysis
-
-```python
-def plot_residuals(actual, predicted, title='Residual Analysis'):
-    """
-    Analyze forecast residuals
-    """
-    residuals = actual - predicted
-    
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-    
-    # Residuals over time
-    axes[0, 0].plot(actual.index, residuals)
-    axes[0, 0].axhline(y=0, color='r', linestyle='--')
-    axes[0, 0].set_title('Residuals Over Time')
-    axes[0, 0].set_ylabel('Residual')
-    axes[0, 0].grid(True, alpha=0.3)
-    
-    # Histogram
-    axes[0, 1].hist(residuals, bins=20, edgecolor='black')
-    axes[0, 1].set_title('Residual Distribution')
-    axes[0, 1].set_xlabel('Residual')
-    axes[0, 1].set_ylabel('Frequency')
-    
-    # ACF of residuals
-    from statsmodels.graphics.tsaplots import plot_acf
-    plot_acf(residuals.dropna(), lags=20, ax=axes[1, 0])
-    axes[1, 0].set_title('ACF of Residuals')
-    
-    # Q-Q plot
-    from scipy import stats
-    stats.probplot(residuals.dropna(), dist="norm", plot=axes[1, 1])
-    axes[1, 1].set_title('Q-Q Plot')
-    
-    fig.suptitle(title, fontsize=14, y=1.02)
-    plt.tight_layout()
-    plt.show()
-    
-    # Statistical test
-    print(f"\nResidual Statistics:")
-    print(f"  Mean: {residuals.mean():.4f} (should be ~0)")
-    print(f"  Std:  {residuals.std():.4f}")
-
-plot_residuals(test, mul_forecast, 'HW Multiplicative - Residuals')
-```
-
----
-
-## 5. Exam Preparation
-
-### 5.1 Method Comparison
-
-| Method | Components | Parameters | Best For |
-|--------|------------|------------|----------|
-| **SMA** | None | Window size | Quick smoothing |
-| **SES** | Level | α | No trend/season |
-| **Holt** | Level + Trend | α, β | Trend, no season |
-| **Holt-Winters** | Level + Trend + Season | α, β, γ | Complete data |
-
-### 5.2 Common Exam Questions
-
-**Q1: Given sales [100, 105, 110], calculate 2-period MA.**
-
-**Solution:**
-
-MA at t=2: $\frac{100 + 105}{2} = 102.5$
-
-MA at t=3: $\frac{105 + 110}{2} = 107.5$
-
-**Result:** [NaN, 102.5, 107.5]
-
-**Q2: With α=0.3, forecast is 100, actual is 110. Calculate next forecast.**
-
-**Solution:**
-
-$$\hat{Y}_{t+1} = \alpha Y_t + (1-\alpha)\hat{Y}_t$$
-$$= 0.3 \times 110 + 0.7 \times 100$$
-$$= 33 + 70 = 103$$
-
-**Q3: When to use additive vs multiplicative Holt-Winters?**
-
-**Answer:**
-
-**Additive:** Seasonal variation constant
-```
-Jan: 1000 ± 100
-Jul: 2000 ± 100  (same ±100)
-```
-
-**Multiplicative:** Seasonal variation grows
-```
-Jan: 1000 × 1.1 = 1100
-Jul: 2000 × 1.1 = 2200  (grows proportionally)
-```
-
-### 5.3 Interview Questions
-
-**Q (E-commerce): You use MA-12 but forecasts lag 2 months behind actual trends. Fix?**
-
-**A:** Moving Average inherently lags. Solutions:
-1. **Reduce window:** Use MA-6 or MA-3 (more responsive)
-2. **Switch to Exponential Smoothing:** Weights recent data more
-3. **Use Holt's method:** Explicitly models trend
-4. **Increase α:** If using exponential smoothing
-
-**Q (Forecasting Role): Client wants simple, interpretable method for seasonal sales. Recommend?**
-
-**A:** **Holt-Winters (Additive or Multiplicative)**
-
-Reasons:
-- Handles trend + seasonality
-- Interpretable parameters
-- Industry standard
-- Easy to explain to client
-- Good baseline before complex models
-
-**Recommendation process:**
-1. Plot data → check if seasonal amplitude grows
-2. If constant → Additive
-3. If grows → Multiplicative
-4. Optimize α, β, γ automatically
-5. Validate on holdout set
-
----
-
-## Summary
-
-**Key Takeaways:**
-- **Moving Average:** Simple smoothing, equal weights, lags trend
-- **SES:** Exponential weights, good for level-only data
-- **Holt:** Adds trend component
-- **Holt-Winters:** Complete model with trend + seasonality
-
-**Parameter Meanings:**
-- **α:** Level smoothing (0 = no update, 1 = just current value)
-- **β:** Trend smoothing
-- **γ:** Seasonal smoothing
-
-**Model Selection:**
-- No trend/season → SES
-- Trend only → Holt
-- Trend + Season → Holt-Winters
-- Growing seasonality → Multiplicative
-- Constant seasonality → Additive
-
-**When Smoothing Fails:**
-- Complex non-linear patterns → Try ARIMA
-- Multiple seasonalities → Try SARIMA or ML methods
-- Structural breaks → Segment data
-
-**Next Class:** ACF/PACF and ARIMA models
+*These methods progressively handle Trend, Seasonality, and Noise.*

@@ -45,6 +45,18 @@ Hard Clustering (K-Means):      Soft Clustering (GMM):
 
 ---
 
+### 1.4 Real-World Example: Streaming Service (e.g., JioHotstar)
+Imagine clustering users based on **Age**, **Device**, and **Watch Duration**:
+
+| User Type | Age | Device | Duration | Likely Cluster |
+|-----------|-----|--------|----------|----------------|
+| **Young Viewers** | 18-25 | Mobile | Short (Reels/Shorts) | "On-the-go Gen Z" |
+| **Senior Adults** | 50+ | TV/iPad | Long (Movies/News) | "Home Entertainment" |
+
+**Objective:** Target ads differently. Show gaming ads to Cluster 1 and insurance/travel ads to Cluster 2.
+
+---
+
 ## 2. K-Means Algorithm
 
 ### 2.1 Intuitive Explanation

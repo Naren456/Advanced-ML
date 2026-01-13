@@ -62,53 +62,6 @@ Professional, textbook-quality notes for all 22 classes covering Dimensionality 
 
 ---
 
-## What Each Note Includes
-
-Every class note contains:
-
-✅ **Professional Formatting**
-- Clean, textbook-style organization
-- No emojis (academic standard)
-- Clear hierarchical structure
-- Table of contents
-
-✅ **Complete Mathematical Theory**
-- Full derivations with steps
-- Convergence proofs where applicable
-- Complexity analysis (time/space)
-- Formula summaries
-
-✅ **Worked Examples**
-- Step-by-step numerical calculations
-- Real datasets where appropriate
-- Multiple difficulty levels
-- Edge cases covered
-
-✅ **Visual Explanations**
-- ASCII diagrams for concepts
-- Matplotlib code for visualizations
-- Comparison tables
-- Decision trees
-
-✅ **Comprehensive Implementations**
-- Complete Python code
-- Production-ready examples
-- scikit-learn, statsmodels, pmdarima
-- Error handling and validation
-
-✅ **Exam Preparation**
-- Key formulas summary tables
-- Common exam questions with solutions
-- Conceptual questions
-- Numerical problem templates
-
-✅ **Interview Questions**
-- FAANG-style technical questions
-- Practical scenario-based questions
-- How-to-explain-to-stakeholders
-- Debugging and optimization
-
----
 
 ## How to Use These Notes
 
